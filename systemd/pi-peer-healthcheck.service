@@ -4,7 +4,8 @@ After=network.target
 
 [Service]
 Type=simple
-ExecStart=/usr/bin/python3 /usr/local/bin/pi-peer-healthcheck.py
+EnvironmentFile=/etc/pi-peer-healthcheck/pi-peer-healthcheck.conf
+ExecStart=/usr/bin/python3 /usr/local/bin/pi-peer-healthcheck.py --peers $PEERS --daemonize --dnscheck --interval=$INTERVAL --email=$EMAIL
 Restart=always
 
 [Install]
