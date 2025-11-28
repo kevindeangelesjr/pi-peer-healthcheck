@@ -1,0 +1,11 @@
+[Unit]
+Description=pi-peer-healthcheck
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 /usr/local/bin/pi-peer-healthcheck.py
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
