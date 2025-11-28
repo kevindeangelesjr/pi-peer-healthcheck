@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-### Author: Kevin DeAngeles
+### Author: Kevin DeAngeles (kdeangeles@protonmail.com)
 ### Date: 11/28/2025
 ### Python Version: 3.14.0
 ### Script Version: 1.0.0
