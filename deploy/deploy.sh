@@ -6,13 +6,16 @@
 ### Description: Deploy script for pi-peer-healthcheck
 
 ### Variables
-config_file="../pi-peer-healthcheck.conf"
+script_dir=$(dirname "$0")
+config_file="../config/pi-peer-healthcheck.conf"
 config_deploy_dir="/etc/pi-peer-healthcheck"
-config_file_deploy_path="$config_dir/pi-peer-healthcheck.conf"
-service_file="../deploy/pi-peer-healthcheck.service"
-service_file_deploy_path="/etc/systemd/system/pi-peer-healthcheck.service"
-daemon_name="pi-peer-healthcheck.service"
-logrotate_file="../logrotate/pi-peer-healthcheck.logrotate"
+config_file_deploy_path="${config_deploy_dir}/pi-peer-healthcheck.conf"
+script_file="../pi-peer-healthcheck.py"
+script_deploy_path="/usr/local/bin/pi-peer-healthcheck.py"
+service_file="../systemd/pphd.service"
+service_file_deploy_path="/etc/systemd/system/pphd.service"
+daemon_name="pphd.service"
+logrotate_file="../logrotate/pi-peer-healthcheck"
 logrotate_deploy_path="/etc/logrotate.d/pi-peer-healthcheck"
 
 ### Functions ###
@@ -73,32 +76,48 @@ function main(){
         exit 1
     fi
 
+    cd "$script_dir" || { echo "Failed to change directory to $script_dir"; exit 1; }
+
     # Modify config file with given command line arguments
-    # Make sure peers are space separated not comma separated
-    peers=$(echo "$peers" | tr ',' ' ')
-    sed -i "s|^peers = .*|peers = $peers|" "$config_file"
-    sed -i "s|^interval = .*|interval = $interval|" "$config_file"
-    sed -i "s|^email = .*|email = $email|" "$config_file"
-    sed -i "s|^logfile = .*|logfile = $logfile|" "$config_file"
-    sed -i "s|^timeout = .*|timeout = $timeout|" "$config_file"
-    sed -i "s|^smtpserver = .*|smtpserver = $smtpserver|" "$config_file"
+    echo "Configuring pi-peer-healthcheck.conf with provided parameters ..."
+    sed -i "s|^PEERS=.*|PEERS=$peers|" "$config_file"
+    sed -i "s|^INTERVAL=.*|INTERVAL=$interval|" "$config_file"
+    sed -i "s|^EMAIL=.*|EMAIL=$email|" "$config_file"
+    sed -i "s|^LOGFILE=.*|LOGFILE=$logfile|" "$config_file"
+    sed -i "s|^TIMEOUT=.*|TIMEOUT=$timeout|" "$config_file"
+    sed -i "s|^SMTP_SERVER=.*|SMTP_SERVER=$smtpserver|" "$config_file"
 
     # Copy config file to /etc/pi-peer-healthcheck/pi-peer-healthcheck.conf
+    echo "Deploying pi-peer-healthcheck config file ... "
     sudo mkdir -p "$config_deploy_dir"
     sudo cp "$config_file" "$config_file_deploy_path"
     if [ $? -ne 0 ]; then
         echo "Failed to copy config file to $config_file_deploy_path"
         exit 1
     fi
+    echo "Config file deployed successfully to $config_file_deploy_path"
 
-    # Copy service file to /etc/systemd/system/pi-peer-healthcheck.service
-    sudo cp "$service_file" "$service_file_deploy_path"
+    # Copy the main script to /usr/local/bin/pi-peer-healthcheck.py
+    echo "Deploying pi-peer-healthcheck script ... "
+    sudo cp "$script_file" "$script_deploy_path"
     if [ $? -ne 0 ]; then
-        echo "Failed to copy service file to \$service_file_deploy_path"
+        echo "Failed to copy script file to $script_deploy_path"
         exit 1
     fi
+    sudo chmod +x "$script_deploy_path"
+    echo "Script file deployed successfully to $script_deploy_path"
+
+    # Copy service file to /etc/systemd/system/pi-peer-healthcheck.service
+    echo "Deploying pi-peer-healthcheck systemd service ... "
+    sudo cp "${service_file}" "${service_file_deploy_path}"
+    if [ $? -ne 0 ]; then
+        echo "Failed to copy service file to ${service_file_deploy_path}"
+        exit 1
+    fi
+    echo "Service file deployed successfully to $service_file_deploy_path"
 
     # Start and enable the service
+    echo "Starting and enabling ${daemon_name} service ... "
     sudo systemctl daemon-reload
     sudo systemctl start ${daemon_name}
     if [ $? -ne 0 ]; then
@@ -110,17 +129,23 @@ function main(){
         echo "Failed to enable ${daemon_name}"
         exit 1
     fi
+    echo "Service ${daemon_name} started and enabled successfully."
+
+    # Set logrotate logfile name
+    echo "Configuring logrotate for pi-peer-healthcheck ... "
+    sed -i "s|/var/log/pi-peer-healthcheck.log|$logfile|" "$logrotate_file"
 
     # Ensure logrotate is installed
+    echo "Deploying logrotate configuration for pi-peer-healthcheck ... "
     if ! command -v logrotate &> /dev/null; then
         echo "logrotate could not be found, logrotate config NOT copied."
-    fi
-
-    # Copy logrotate configuration
-    sudo cp "$logrotate_file" "$logrotate_deploy_path"
-    if [ $? -ne 0 ]; then
-        echo "Failed to copy logrotate configuration to $logrotate_deploy_path"
-        exit 1
+    else
+        # Copy logrotate configuration
+        sudo cp "$logrotate_file" "$logrotate_deploy_path"
+        if [ $? -ne 0 ]; then
+            echo "Failed to copy logrotate configuration to $logrotate_deploy_path"
+        fi
+        echo "Logrotate configuration deployed successfully to $logrotate_deploy_path"
     fi
 }
 

@@ -7,7 +7,6 @@
 ### Description: This script allows Raspberry Pi devices to perform healthchecks on their peers in a network.
 
 ### Imports ###
-import PiPeer
 import argparse
 import logging
 from logging.handlers import RotatingFileHandler
@@ -17,11 +16,68 @@ from email.utils import make_msgid
 import socket
 import signal
 import sys
+import subprocess
 
 ### Constants
 SCRIPT_VERSION = "1.0.0"
 SUBJECT_PREFIX = "[pi-peer-healthcheck ALERT]: "
 EMAIL_FROM = f"pi-peer-healthcheck@{socket.gethostname()}.kevind.link"
+
+### Classes ###
+class PiPeer:
+    """
+    Class representing a Raspberry Pi peer in the network.
+    """
+
+    def __init__(self, hostname):
+        self.hostname = hostname
+        self.status = "unknown"
+
+        self.ip_address = self.resolve_ip()
+        if self.ip_address is None:
+            raise ValueError(f"Could not resolve hostname for peer: {hostname}")
+    
+    def resolve_ip(self):
+        """
+        Resolve the IP address of the peer from its hostname.
+        """
+        try:
+            return socket.gethostbyname(self.hostname)
+            self.status = "healthy"
+        except Exception:
+            return None
+    
+    def peer_ping(self, timeout=5):
+        """
+        Perform a ping to the peer to check its health.
+        """
+        try:
+            ping_command = f"ping -c 4 -W {timeout} {self.ip_address}"
+            ping_result = subprocess.run(ping_command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            if ping_result.returncode != 0:
+                self.status = "unhealthy"
+                return False
+            self.status = "healthy"
+            return True
+        except Exception:
+            self.status = "unhealthy"
+            return False
+    
+    def test_dns(self, timeout=5):
+        """
+        Test that the peer is responding to DNS queries.
+        """
+        try:
+            dns_command = f"timeout {timeout} nslookup {self.hostname} {self.ip_address}"
+            dns_result = subprocess.run(dns_command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            if dns_result.returncode != 0:
+                self.status = "unhealthy"
+                return False
+            self.status = "healthy"
+            return True
+        except Exception:
+            self.status = "unhealthy"
+            return False
 
 ### Functions ###
 def interrupt_handler(signum, frame):
@@ -42,14 +98,13 @@ def get_args():
     parser = argparse.ArgumentParser(description="Raspberry Pi Peer Healthcheck Script")
     parser.add_argument("--peers",
                         type=str,
-                        nargs='+',
-                        help="List of Raspberry Pi peer hostnames to check",
+                        help="Comma separated list of Raspberry Pi peer hostnames to check",
                         required=True)
     parser.add_argument("--daemonize",
                         action="store_true",
                         help="Run the script as a daemon",
                         required=False)
-    parser.add_argument("-timeout",
+    parser.add_argument("--timeout",
                         type=int,
                         default=5,
                         help="Timeout in seconds for peer healthchecks (default: 5)",
@@ -90,7 +145,7 @@ def get_args():
     parsedArgs = parser.parse_args()
 
     return {
-        "peerList": parsedArgs.peers,
+        "peerList": parsedArgs.peers.split(','),
         "daemonize": parsedArgs.daemonize,
         "timeout": parsedArgs.timeout,
         "verbose": parsedArgs.verbose,
@@ -131,7 +186,7 @@ def run(argDict, logger):
     peerList = []
     for peer in argDict["peerList"]:
         try:
-            newPi = PiPeer.PiPeer(peer)
+            newPi = PiPeer(peer)
             peerList.append(newPi)
             logger.debug(f"Successfully create PiPeer object for {peer} with IP {newPi.ip_address}.")
             logger.debug(f"PiPeer object details: {newPi.__dict__}")

@@ -5,7 +5,7 @@ After=network.target
 [Service]
 Type=simple
 EnvironmentFile=/etc/pi-peer-healthcheck/pi-peer-healthcheck.conf
-ExecStart=/usr/bin/python3 /usr/local/bin/pi-peer-healthcheck.py --peers $PEERS --daemonize --dnscheck --interval=$INTERVAL --email=$EMAIL --logfile=$LOGFILE --timeout=$TIMEOUT --smtp-server=$SMTP_SERVER
+ExecStart=/usr/bin/python3 /usr/local/bin/pi-peer-healthcheck.py --verbose --peers ${PEERS} --daemonize --dnscheck --interval=${INTERVAL} --email=${EMAIL} --logfile=${LOGFILE} --timeout=${TIMEOUT} --smtp-server=${SMTP_SERVER}
 Restart=on-failure
 RestartSec=60
 StandardOutput=journal
