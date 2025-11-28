@@ -1,12 +1,15 @@
 [Unit]
-Description=pi-peer-healthcheck
+Description=pi-peer-healthcheck - Raspberry Pi Peer Healthcheck Script
 After=network.target
 
 [Service]
 Type=simple
 EnvironmentFile=/etc/pi-peer-healthcheck/pi-peer-healthcheck.conf
-ExecStart=/usr/bin/python3 /usr/local/bin/pi-peer-healthcheck.py --peers $PEERS --daemonize --dnscheck --interval=$INTERVAL --email=$EMAIL
-Restart=always
+ExecStart=/usr/bin/python3 /usr/local/bin/pi-peer-healthcheck.py --peers $PEERS --daemonize --dnscheck --interval=$INTERVAL --email=$EMAIL --logfile=$LOGFILE --timeout=$TIMEOUT --smtp-server=$SMTP_SERVER
+Restart=on-failure
+RestartSec=60
+StandardOutput=journal
+StandardError=journal
 
 [Install]
-WantedBy=multi-user.target
+WantedBy=default.target

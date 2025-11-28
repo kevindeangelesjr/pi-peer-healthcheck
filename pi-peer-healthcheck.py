@@ -15,6 +15,8 @@ import smtplib
 from email.mime.text import MIMEText
 from email.utils import make_msgid
 import socket
+import signal
+import sys
 
 ### Constants
 SCRIPT_VERSION = "1.0.0"
@@ -22,6 +24,14 @@ SUBJECT_PREFIX = "[pi-peer-healthcheck ALERT]: "
 EMAIL_FROM = f"pi-peer-healthcheck@{socket.gethostname()}.kevind.link"
 
 ### Functions ###
+def interrupt_handler(signum, frame):
+    """
+    Handle interrupt signals for graceful shutdown
+    """
+    logger.info(f"Received interrupt signal ({signum}). Shutting down pi-peer-healthcheck ... ")
+    logging.shutdown()
+    sys.exit(signum)
+
 def get_args():
     """
     Parse command line arguments
@@ -110,23 +120,11 @@ def send_email(email_address, smtp_server, subject, body):
     
     return msg.as_string()
 
-def main():
+def run(argDict, logger):
     """
     Main function
     """
 
-    # Parse command line arguments
-    argDict = get_args()
-
-    # Initialize logger
-    logging.basicConfig(level=logging.DEBUG if argDict["verbose"] else logging.INFO,
-                        format='%(asctime)s - %(levelname)s - %(message)s',
-                        handlers=[logging.FileHandler(argDict["logfile"]),
-                                  logging.StreamHandler()])
-    logger = logging.getLogger()
-
-    logger.debug("Verbose logging enabled.")
-    logger.debug("Parsed arguments successfully: %s", argDict)
     logger.info("Initializing pi-peer-healthcheck ... ")
 
     # Create PiPeer objects for each peer
@@ -211,7 +209,34 @@ def main():
             logger.info(f"Sleeping for {argDict['interval']} seconds before next healthcheck cycle ... ")
             import time
             time.sleep(argDict["interval"])
+    
+    sys.exit(0)
 
 ### Main ###
 if __name__ == "__main__":
-    main()
+
+    # Parse command line arguments
+    argDict = get_args()
+
+    # Initialize logger
+    logging.basicConfig(level=logging.DEBUG if argDict["verbose"] else logging.INFO,
+                        format='%(asctime)s - %(levelname)s - %(message)s',
+                        handlers=[logging.FileHandler(argDict["logfile"]),
+                                logging.StreamHandler()])
+    logger = logging.getLogger()
+
+    logger.debug("Verbose logging enabled.")
+    logger.debug("Parsed arguments successfully: %s", argDict)
+    
+    logger.debug("Setting up interrupt signal handlers ... ")
+    try:
+        signal.signal(signal.SIGINT, interrupt_handler)
+        signal.signal(signal.SIGTERM, interrupt_handler)
+        signal.signal(signal.SIGQUIT, interrupt_handler)
+        logger.debug("Interrupt signal handlers set up successfully.")
+    except Exception as e:
+        logger.error(f"Failed to set up interrupt signal handlers: {e}")
+        sys.exit(1)
+
+    logger.debug("Starting main pi-peer-healthcheck run function ... ")
+    run(argDict, logger)
