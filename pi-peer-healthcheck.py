@@ -17,6 +17,7 @@ import socket
 import signal
 import sys
 import subprocess
+import time
 
 ### Constants
 SCRIPT_VERSION = "1.0.0"
@@ -262,7 +263,6 @@ def run(argDict, logger):
             break
         else:
             logger.info(f"Sleeping for {argDict['interval']} seconds before next healthcheck cycle ... ")
-            import time
             time.sleep(argDict["interval"])
     
     sys.exit(0)
